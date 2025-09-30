@@ -2,7 +2,6 @@
 build/
 *.o
 *.bin
-*.iso
 
 # Editor files
 *~
