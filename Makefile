@@ -31,13 +31,25 @@ ALL_OBJS = $(BOOT_OBJ) $(KERNEL_OBJ) $(GAME_OBJ)
 # Target binary
 KERNEL_BIN = $(BUILDDIR)/kernel.bin
 ISO_FILE = $(BUILDDIR)/undertheboard-os.iso
+ISO_DIR = iso
+FINAL_ISO_FILE = $(ISO_DIR)/undertheboard-os.iso
 
 # Default target
-all: $(ISO_FILE)
+all: $(FINAL_ISO_FILE)
 
 # Create build directory
 $(BUILDDIR):
 	mkdir -p $(BUILDDIR)
+
+# Create iso directory  
+$(ISO_DIR):
+	mkdir -p $(ISO_DIR)
+
+# Copy ISO to iso folder
+$(FINAL_ISO_FILE): $(ISO_FILE) | $(ISO_DIR)
+	@echo "Copying ISO to iso folder..."
+	@cp $(ISO_FILE) $(FINAL_ISO_FILE)
+	@echo "Bootable ISO created: $(FINAL_ISO_FILE)"
 
 # Compile assembly files
 $(BUILDDIR)/%.o: $(SRCDIR)/boot/%.s | $(BUILDDIR)
@@ -68,18 +80,18 @@ verify: $(KERNEL_BIN)
 	fi
 
 # Create GRUB configuration
-$(BUILDDIR)/grub.cfg: | $(BUILDDIR)
+$(BUILDDIR)/iso/boot/grub/grub.cfg: | $(BUILDDIR)
 	@mkdir -p $(BUILDDIR)/iso/boot/grub
-	@echo 'menuentry "UnderTheBoard OS" {' > $(BUILDDIR)/iso/boot/grub/grub.cfg
-	@echo '    multiboot /boot/kernel.bin' >> $(BUILDDIR)/iso/boot/grub/grub.cfg
-	@echo '}' >> $(BUILDDIR)/iso/boot/grub/grub.cfg
+	@echo 'menuentry "UnderTheBoard OS" {' > $@
+	@echo '    multiboot /boot/kernel.bin' >> $@
+	@echo '}' >> $@
 
 # Create ISO image
-$(ISO_FILE): $(KERNEL_BIN) $(BUILDDIR)/grub.cfg | $(BUILDDIR)
+$(ISO_FILE): $(KERNEL_BIN) $(BUILDDIR)/iso/boot/grub/grub.cfg | $(BUILDDIR)
 	@mkdir -p $(BUILDDIR)/iso/boot
 	@cp $(KERNEL_BIN) $(BUILDDIR)/iso/boot/kernel.bin
 	@if command -v grub-mkrescue >/dev/null 2>&1; then \
-		grub-mkrescue -o $(ISO_FILE) $(BUILDDIR)/iso 2>/dev/null || \
+		grub-mkrescue -o $(ISO_FILE) $(BUILDDIR)/iso || \
 		echo "Warning: grub-mkrescue failed, ISO not created"; \
 	else \
 		echo "Note: grub-mkrescue not available, creating basic structure only"; \
@@ -87,15 +99,15 @@ $(ISO_FILE): $(KERNEL_BIN) $(BUILDDIR)/grub.cfg | $(BUILDDIR)
 	fi
 
 # Test with QEMU (if available)
-test: $(ISO_FILE)
+test: $(FINAL_ISO_FILE)
 	@if command -v qemu-system-i386 >/dev/null 2>&1; then \
 		echo "Starting QEMU (press Ctrl+Alt+G to release mouse, Ctrl+Alt+Q to quit)..."; \
-		qemu-system-i386 -cdrom $(ISO_FILE); \
+		qemu-system-i386 -cdrom $(FINAL_ISO_FILE); \
 	else \
 		echo "QEMU not available. To test manually:"; \
 		echo "1. Use VirtualBox, VMware, or other VM software"; \
-		echo "2. Boot from $(ISO_FILE)"; \
-		echo "3. Or use: qemu-system-i386 -cdrom $(ISO_FILE)"; \
+		echo "2. Boot from $(FINAL_ISO_FILE)"; \
+		echo "3. Or use: qemu-system-i386 -cdrom $(FINAL_ISO_FILE)"; \
 	fi
 
 # Test kernel directly (without ISO)
@@ -109,7 +121,7 @@ test-kernel: $(KERNEL_BIN)
 
 # Clean build files
 clean:
-	rm -rf $(BUILDDIR)
+	rm -rf $(BUILDDIR) $(ISO_DIR)
 
 # Show build information
 info:
@@ -120,7 +132,7 @@ info:
 	@echo "Linker: $(LD)"
 	@echo "Target: x86 32-bit (multiboot)"
 	@echo "Output: $(KERNEL_BIN)"
-	@echo "ISO: $(ISO_FILE)"
+	@echo "ISO: $(FINAL_ISO_FILE)"
 	@echo ""
 	@echo "Available targets:"
 	@echo "  all      - Build complete OS"
